@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.0.0',
+    version: '1.1.0',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -473,7 +473,7 @@ exports.BaozimhInfo = {
     contentRating: types_1.ContentRating.MATURE,
     websiteBaseURL: BASE_URL,
     sourceTags: [],
-    intents: types_1.SourceIntents.MANGA_CHAPTERS
+    intents: types_1.SourceIntents.MANGA_CHAPTERS | types_1.SourceIntents.HOMEPAGE_SECTIONS
 };
 class Baozimh extends types_1.Source {
     constructor() {
@@ -504,6 +504,57 @@ class Baozimh extends types_1.Source {
     }
     mangaIdFromHref(href) {
         return href.split('/comic/')[1]?.split(/[?#]/)[0] ?? '';
+    }
+    // Scope cards to one section so neighboring recommendation rows don't mix.
+    parseCards($, container) {
+        const results = [];
+        const seen = new Set();
+        container.find('.comics-card').each((_index, element) => {
+            const card = $(element);
+            const link = card.find('a[href*="/comic/"]').first();
+            const mangaId = this.mangaIdFromHref(link.attr('href') ?? '');
+            if (!mangaId || mangaId.startsWith('chapter/') || seen.has(mangaId))
+                return;
+            const title = card.find('.comics-card__title').first().text().trim()
+                || link.attr('title')?.trim() || link.attr('aria-label')?.trim();
+            const imageElement = card.find('amp-img, img').not('[placeholder], [fallback]').first();
+            const image = imageElement.attr('data-src') || imageElement.attr('src') || '';
+            if (!title || !image)
+                return;
+            seen.add(mangaId);
+            results.push(App.createPartialSourceManga({
+                mangaId,
+                title,
+                image: this.absoluteUrl(image),
+                subtitle: card.find('small.tags').first().text().replace(/\s+/g, ' ').trim() || undefined
+            }));
+        });
+        return results;
+    }
+    async getHomePageSections(sectionCallback) {
+        const $ = await this.getDocument(BASE_URL + '/');
+        const seen = new Set();
+        $('.index-recommend-items').each((_index, element) => {
+            const container = $(element);
+            const title = container.find('.catalog-title').first().text().replace(/\s+/g, ' ').trim();
+            if (!title || seen.has(title))
+                return;
+            const items = this.parseCards($, container);
+            if (!items.length)
+                return;
+            seen.add(title);
+            sectionCallback(App.createHomeSection({
+                // Use the heading rather than its position to keep IDs stable on reorder.
+                id: 'home-' + encodeURIComponent(title),
+                title,
+                type: 'singleRowNormal',
+                items,
+                // All cards in this homepage row are included. No fabricated pagination.
+                containsMoreItems: false
+            }));
+        });
+        if (!seen.size)
+            throw new Error('Baozimh homepage returned no manga listings. Please try again later.');
     }
     async getMangaDetails(mangaId) {
         const $ = await this.getDocument(`${BASE_URL}/comic/${mangaId}`);
