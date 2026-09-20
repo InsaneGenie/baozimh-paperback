@@ -146,7 +146,7 @@ export class Baozimh extends Source {
         const tags = genres.length === 0 ? [] : [App.createTagSection({
             id: 'genres',
             label: '類型',
-            tags: genres.map((genre) => App.createTag({ id: genre, label: genre }))
+            tags: genres.map((genre) => App.createTag({ id: genre, label: 類型 }))
         })]
 
         return App.createSourceManga({
