@@ -1,0 +1,38 @@
+name: Bundle and publish source
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Check out existing bundles
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: bundles
+
+      - run: npm ci
+      - run: npm run bundle -- --folder=main
+
+      - name: Publish GitHub Pages branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: bundles
