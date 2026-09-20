@@ -16,7 +16,7 @@ import {
 const BASE_URL = 'https://www.baozimh.com'
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.2.0',
+    version: '1.3.0',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -97,12 +97,41 @@ export class Baozimh extends Source {
                 id: 'home-' + encodeURIComponent(title),
                 title,
                 type: 'singleRowNormal',
-                items,
-                // All cards in this homepage row are included. No fabricated pagination.
-                containsMoreItems: false
+                items: items.slice(0, 12),
+                containsMoreItems: ['熱門漫畫', '推薦國漫', '推薦韓漫', '推薦日漫', '熱血漫畫', '最新上架', '最近更新'].includes(title)
             }))
         })
         if (!seen.size) throw new Error('Baozimh homepage returned no manga listings. Please try again later.')
+    }
+
+    override async getViewMoreItems(sectionId: string, metadata: any): Promise<PagedResults> {
+        const section = sectionId.startsWith('home-') ? decodeURIComponent(sectionId.slice(5)) : ''
+        const catalogFilters: Record<string, Record<string, string>> = {
+            '熱門漫畫': {},
+            '推薦國漫': {region: 'cn'},
+            '推薦韓漫': {region: 'kr'},
+            '推薦日漫': {region: 'jp'},
+            '熱血漫畫': {type: 'rexie'}
+        }
+        if (Object.prototype.hasOwnProperty.call(catalogFilters, section)) {
+            // These are broader matching catalogs, not additional curated recommendations.
+            return this.getCatalogPage({type: 'all', region: 'all', state: 'all', ...catalogFilters[section]}, metadata)
+        }
+        if (section === '最新上架') {
+            const $ = await this.getDocument(BASE_URL + '/list/new')
+            const results = this.parseCards($, $.root())
+            if (!results.length) throw new Error('Baozimh returned no new titles. Please try again later.')
+            return App.createPagedResults({results})
+        }
+        if (section === '最近更新') {
+            const $ = await this.getDocument(BASE_URL + '/')
+            const container = $('.index-recommend-items').filter((_index: number, element: any) =>
+                $(element).find('.catalog-title').first().text().trim() === section).first()
+            const results = this.parseCards($, container)
+            if (!results.length) throw new Error('Baozimh returned no recent updates. Please try again later.')
+            return App.createPagedResults({results})
+        }
+        throw new Error('Unknown Baozimh Discover section. Refresh Discover and try again.')
     }
 
     async getMangaDetails(mangaId: string): Promise<SourceManga> {
@@ -215,6 +244,10 @@ export class Baozimh extends Source {
             if (values[group] !== 'all' && values[group] !== value) throw new Error('每組只能選一項。Select only one genre, one region, and one status.')
             values[group] = value
         }
+        return this.getCatalogPage(values, metadata)
+    }
+
+    private async getCatalogPage(values: Record<string, string>, metadata: any): Promise<PagedResults> {
         const key = JSON.stringify(values)
         const page = metadata?.key === key && Number.isInteger(metadata.page) && metadata.page > 0 ? metadata.page : 1
         const url = BASE_URL + '/api/bzmhq/amp_comic_list?' +
