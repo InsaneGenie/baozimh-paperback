@@ -16,7 +16,7 @@ import {
 const BASE_URL = 'https://www.baozimh.com'
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.7.0',
+    version: '1.8.0',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -171,7 +171,13 @@ export class Baozimh extends Source {
         $('a.comics-chapters__item, a[href*="/user/page_direct?"]').each((_index: number, element: any) => {
             const href = $(element).attr('href')?.replace(/&amp;/g, '&') ?? ''
             const slotText = href.match(/[?&]chapter_slot=(\d+)/)?.[1]
-            const dedupeKey = slotText ? `slot:${slotText}` : href
+            const sectionSlot = href.match(/[?&]section_slot=(\d+)/)?.[1]
+            // Every split section shares chapter_slot; section_slot identifies
+            // the individual reader URL. Deduplicating by chapter_slot alone
+            // silently removed parts 2–4 before they could be grouped.
+            const dedupeKey = slotText
+                ? `slot:${slotText}:section:${sectionSlot ?? href}`
+                : href
             if (!href || seen.has(dedupeKey)) return
             seen.add(dedupeKey)
 
