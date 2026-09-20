@@ -16,7 +16,7 @@ import {
 const BASE_URL = 'https://www.baozimh.com'
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.5.0',
+    version: '1.5.1',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -238,8 +238,16 @@ export class Baozimh extends Source {
             // The manga page normally lists only 0_1.html. Baozimh stores the
             // remaining parts at 0_1_2.html, 0_1_3.html, etc., so discover
             // those continuation URLs from the canonical reader URL.
-            const canonical = $('link[rel="canonical"]').attr('href') ?? ''
-            const match = canonical.match(/^(https?:\/\/[^/]+\/comic\/chapter\/[^/]+\/\d+_(\d+))\.html$/)
+            // Depending on how the reader was opened, Paperback may give us a
+            // direct chapter URL, a page-direct redirect URL, or a URL that
+            // already includes a continuation suffix. Normalize all of them
+            // to the unsuffixed chapter URL before probing the remaining parts.
+            const canonical = this.absoluteUrl(
+                $('link[rel="canonical"]').attr('href')
+                || $('meta[property="og:url"]').attr('content')
+                || url
+            )
+            const match = canonical.match(/^(https?:\/\/[^/]+\/comic\/chapter\/[^/]+\/\d+_(\d+))(?:_\d+)?\.html(?:[?#].*)?$/)
             if (!match) continue
             const base = match[1]
             // Baozimh/TWManga normally uses only a handful of continuation pages.
