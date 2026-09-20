@@ -16,7 +16,7 @@ import {
 const BASE_URL = 'https://www.baozimh.com'
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.5.1',
+    version: '1.6.0',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -200,7 +200,12 @@ export class Baozimh extends Source {
         })
 
         return Array.from(chapterGroups.values()).map((group) => App.createChapter({
-            id: encodeURIComponent(JSON.stringify(group.urls)),
+            // Keep the chapter ID as one normal URL. Paperback's automatic
+            // next-chapter transition can normalize/unwrap encoded array IDs,
+            // which leaves it with only part 1. getChapterDetails expands this
+            // starting URL into all continuation parts consistently for both
+            // manual selection and automatic navigation.
+            id: group.urls[0]!,
             chapNum: group.chapNum,
             langCode: 'zh',
             name: group.name
