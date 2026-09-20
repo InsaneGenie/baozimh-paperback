@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.4.1',
+    version: '1.5.0',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -663,15 +663,46 @@ class Baozimh extends types_1.Source {
         }
         const pages = [];
         const seen = new Set();
-        for (const url of urls) {
-            const $ = await this.getDocument(url);
+        const addPages = ($) => {
+            let added = 0;
             $('amp-img.comic-contain__item, .comic-contain img').each((_index, element) => {
                 const page = $(element).attr('data-src') || $(element).attr('src') || '';
                 if (!page || seen.has(page))
                     return;
                 seen.add(page);
                 pages.push(this.absoluteUrl(page));
+                added++;
             });
+            return added;
+        };
+        for (const url of urls) {
+            const $ = await this.getDocument(url);
+            addPages($);
+            // The manga page normally lists only 0_1.html. Baozimh stores the
+            // remaining parts at 0_1_2.html, 0_1_3.html, etc., so discover
+            // those continuation URLs from the canonical reader URL.
+            const canonical = $('link[rel="canonical"]').attr('href') ?? '';
+            const match = canonical.match(/^(https?:\/\/[^/]+\/comic\/chapter\/[^/]+\/\d+_(\d+))\.html$/);
+            if (!match)
+                continue;
+            const base = match[1];
+            // Baozimh/TWManga normally uses only a handful of continuation pages.
+            // Keep a conservative upper bound so a missing page cannot create a
+            // long series of timed-out requests on mobile devices.
+            for (let part = 2; part <= 10; part++) {
+                const continuation = `${base}_${part}.html`;
+                if (urls.includes(continuation))
+                    continue;
+                try {
+                    const continuationDocument = await this.getDocument(continuation);
+                    if (addPages(continuationDocument) === 0)
+                        break;
+                }
+                catch (_error) {
+                    // A missing continuation means the chapter has ended.
+                    break;
+                }
+            }
         }
         if (pages.length === 0)
             throw new Error('Baozimh returned no readable page images for this chapter.');
