@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.8.0',
+    version: '1.9.0',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -667,6 +667,24 @@ class Baozimh extends types_1.Source {
         catch (_error) {
             urls = [this.absoluteUrl(chapterId)];
         }
+        // Baozimh's chapter links are page-direct redirects such as
+        // `chapter_slot=1&comic_id=...&section_slot=0`. The manga page may
+        // expose only section 0 even though the reader has sections 1–4. When
+        // automatic navigation supplies that one redirect URL, resolve the
+        // deterministic TWManga reader URLs directly instead of depending on
+        // the redirect response's canonical metadata.
+        if (urls.length === 1) {
+            const pageDirectUrl = urls[0];
+            const chapterSlot = pageDirectUrl.match(/[?&]chapter_slot=(\d+)/)?.[1];
+            const comicId = pageDirectUrl.match(/[?&]comic_id=([^&]+)/)?.[1];
+            if (chapterSlot && comicId) {
+                const base = `https://www.twmanga.com/comic/chapter/${decodeURIComponent(comicId)}/0_${chapterSlot}`;
+                urls = Array.from({ length: 4 }, (_value, index) => {
+                    const part = index + 1;
+                    return part === 1 ? `${base}.html` : `${base}_${part}.html`;
+                });
+            }
+        }
         // The reader's automatic next-chapter action can provide only the
         // first URL even though the chapter list contains all four parts.
         // Rebuild the URL group from the manga page in that case. Manual
@@ -725,7 +743,15 @@ class Baozimh extends types_1.Source {
             return added;
         };
         for (const url of urls) {
-            const $ = await this.getDocument(url);
+            let $;
+            try {
+                $ = await this.getDocument(url);
+            }
+            catch (_error) {
+                // A generated continuation can legitimately be absent when a
+                // title has fewer sections. Keep the pages already collected.
+                continue;
+            }
             addPages($);
             if (!discoverContinuations)
                 continue;
