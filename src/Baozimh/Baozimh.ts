@@ -16,7 +16,7 @@ import {
 const BASE_URL = 'https://www.baozimh.com'
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.3.0',
+    version: '1.3.1',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -145,7 +145,7 @@ export class Baozimh extends Source {
         const genres = meta('og:novel:category').split(',').map((value) => value.trim()).filter(Boolean)
         const tags = genres.length === 0 ? [] : [App.createTagSection({
             id: 'genres',
-            label: 'Genres',
+            label: '類型',
             tags: genres.map((genre) => App.createTag({ id: genre, label: genre }))
         })]
 
