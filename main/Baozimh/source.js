@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.4.0',
+    version: '1.4.1',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -631,7 +631,10 @@ class Baozimh extends types_1.Source {
                 .replace(/\s*[（(]\s*\d+\s*(?:[/／]|of)\s*\d+\s*[）)]\s*$/i, '')
                 .replace(/\s*[-_－]\s*\d+\s*$/, '')
                 .trim();
-            const key = `${Number.isFinite(chapterNumber) ? chapterNumber : chapterGroups.size + 1}:${groupName}`;
+            // Baozimh may label parts differently (for example, “1”, “1-2”,
+            // or “第一話（下）”), so the chapter number—not the displayed part
+            // text—is the stable grouping key.
+            const key = String(Number.isFinite(chapterNumber) ? chapterNumber : chapterGroups.size + 1);
             const group = chapterGroups.get(key);
             if (group)
                 group.urls.push(this.absoluteUrl(href));
