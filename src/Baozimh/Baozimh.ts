@@ -16,7 +16,7 @@ import {
 const BASE_URL = 'https://www.baozimh.com'
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.3.1',
+    version: '1.3.2',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
