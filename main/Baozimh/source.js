@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.5.1',
+    version: '1.7.0',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -661,6 +661,49 @@ class Baozimh extends types_1.Source {
         catch (_error) {
             urls = [this.absoluteUrl(chapterId)];
         }
+        // The reader's automatic next-chapter action can provide only the
+        // first URL even though the chapter list contains all four parts.
+        // Rebuild the URL group from the manga page in that case. Manual
+        // chapter selection already supplies the complete encoded array, so it
+        // avoids this extra request.
+        if (urls.length === 1) {
+            try {
+                const chapterList = await this.getChapters(mangaId);
+                const initialUrl = urls[0];
+                const chapterNumber = (value) => {
+                    const decoded = decodeURIComponent(value);
+                    const direct = decoded.match(/\/\d+_(\d+)(?:_\d+)?\.html(?:[?#].*)?$/);
+                    if (direct)
+                        return direct[1];
+                    return decoded.match(/[?&]chapter_slot=(\d+)/)?.[1];
+                };
+                const initialNumber = chapterNumber(initialUrl);
+                for (const chapter of chapterList) {
+                    try {
+                        const grouped = JSON.parse(decodeURIComponent(chapter.id));
+                        if (!Array.isArray(grouped) || !grouped.every((value) => typeof value === 'string'))
+                            continue;
+                        const sameUrl = grouped.includes(initialUrl);
+                        const sameNumber = initialNumber !== undefined
+                            && grouped.some((value) => chapterNumber(value) === initialNumber);
+                        if (sameUrl || sameNumber) {
+                            urls = grouped;
+                            break;
+                        }
+                    }
+                    catch (_error) {
+                        // Ignore malformed chapter IDs and continue looking.
+                    }
+                }
+            }
+            catch (_error) {
+                // Continuation discovery below remains the fallback.
+            }
+        }
+        // If the manga page supplied the complete group, there is no need to
+        // probe continuation URLs again. This keeps manual reads fast and
+        // leaves the fallback probing only for one-URL automatic navigation.
+        const discoverContinuations = urls.length === 1;
         const pages = [];
         const seen = new Set();
         const addPages = ($) => {
@@ -678,6 +721,8 @@ class Baozimh extends types_1.Source {
         for (const url of urls) {
             const $ = await this.getDocument(url);
             addPages($);
+            if (!discoverContinuations)
+                continue;
             // The manga page normally lists only 0_1.html. Baozimh stores the
             // remaining parts at 0_1_2.html, 0_1_3.html, etc., so discover
             // those continuation URLs from the canonical reader URL.
