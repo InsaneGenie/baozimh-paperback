@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.3.1',
+    version: '1.3.2',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -595,7 +595,7 @@ class Baozimh extends types_1.Source {
         const tags = genres.length === 0 ? [] : [App.createTagSection({
                 id: 'genres',
                 label: '類型',
-                tags: genres.map((genre) => App.createTag({ id: genre, label: genre }))
+                tags: genres.map((genre) => App.createTag({ id: genre, label: 類型 }))
             })];
         return App.createSourceManga({
             id: mangaId,
