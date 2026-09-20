@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.3.3',
+    version: '1.4.0',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -594,11 +594,8 @@ class Baozimh extends types_1.Source {
         const genres = meta('og:novel:category').split(',').map((value) => value.trim()).filter(Boolean);
         const tags = genres.length === 0 ? [] : [App.createTagSection({
                 id: 'genres',
-                label: '類型',
-                tags: genres.map((genre) => App.createTag({
-                    id: genre,
-                    label: genre
-                }))
+                label: 'Genres',
+                tags: genres.map((genre) => App.createTag({ id: genre, label: genre }))
             })];
         return App.createSourceManga({
             id: mangaId,
@@ -615,7 +612,7 @@ class Baozimh extends types_1.Source {
     }
     async getChapters(mangaId) {
         const $ = await this.getDocument(`${BASE_URL}/comic/${mangaId}`);
-        const chapters = [];
+        const chapterGroups = new Map();
         const seen = new Set();
         $('a.comics-chapters__item, a[href*="/user/page_direct?"]').each((_index, element) => {
             const href = $(element).attr('href')?.replace(/&amp;/g, '&') ?? '';
@@ -626,27 +623,53 @@ class Baozimh extends types_1.Source {
             seen.add(dedupeKey);
             const name = $(element).text().replace(/\s+/g, ' ').trim();
             const numberText = name.match(/(?:第\s*)?(\d+(?:\.\d+)?)/)?.[1];
-            const chapterNumber = Number.parseFloat(numberText ?? slotText ?? String(chapters.length + 1));
-            chapters.push(App.createChapter({
-                id: this.absoluteUrl(href),
-                chapNum: Number.isFinite(chapterNumber) ? chapterNumber : chapters.length + 1,
-                langCode: 'zh',
-                name
-            }));
+            const chapterNumber = Number.parseFloat(numberText ?? slotText ?? String(chapterGroups.size + 1));
+            // Baozimh sometimes publishes one chapter as several adjacent reader
+            // URLs (for example, part 1/4 through part 4/4). Keep those parts in
+            // one Paperback chapter instead of making the reader stop after part 1.
+            const groupName = name
+                .replace(/\s*[（(]\s*\d+\s*(?:[/／]|of)\s*\d+\s*[）)]\s*$/i, '')
+                .replace(/\s*[-_－]\s*\d+\s*$/, '')
+                .trim();
+            const key = `${Number.isFinite(chapterNumber) ? chapterNumber : chapterGroups.size + 1}:${groupName}`;
+            const group = chapterGroups.get(key);
+            if (group)
+                group.urls.push(this.absoluteUrl(href));
+            else
+                chapterGroups.set(key, {
+                    urls: [this.absoluteUrl(href)],
+                    name: groupName || name,
+                    chapNum: Number.isFinite(chapterNumber) ? chapterNumber : chapterGroups.size + 1
+                });
         });
-        return chapters;
+        return Array.from(chapterGroups.values()).map((group) => App.createChapter({
+            id: encodeURIComponent(JSON.stringify(group.urls)),
+            chapNum: group.chapNum,
+            langCode: 'zh',
+            name: group.name
+        }));
     }
     async getChapterDetails(mangaId, chapterId) {
-        const $ = await this.getDocument(this.absoluteUrl(chapterId));
+        let urls;
+        try {
+            const decoded = JSON.parse(decodeURIComponent(chapterId));
+            urls = Array.isArray(decoded) && decoded.every((url) => typeof url === 'string') ? decoded : [this.absoluteUrl(chapterId)];
+        }
+        catch (_error) {
+            urls = [this.absoluteUrl(chapterId)];
+        }
         const pages = [];
         const seen = new Set();
-        $('amp-img.comic-contain__item, .comic-contain img').each((_index, element) => {
-            const page = $(element).attr('data-src') || $(element).attr('src') || '';
-            if (!page || seen.has(page))
-                return;
-            seen.add(page);
-            pages.push(this.absoluteUrl(page));
-        });
+        for (const url of urls) {
+            const $ = await this.getDocument(url);
+            $('amp-img.comic-contain__item, .comic-contain img').each((_index, element) => {
+                const page = $(element).attr('data-src') || $(element).attr('src') || '';
+                if (!page || seen.has(page))
+                    return;
+                seen.add(page);
+                pages.push(this.absoluteUrl(page));
+            });
+        }
         if (pages.length === 0)
             throw new Error('Baozimh returned no readable page images for this chapter.');
         return App.createChapterDetails({
