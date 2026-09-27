@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.9.0',
+    version: '1.9.1',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -483,16 +483,77 @@ class Baozimh extends types_1.Source {
             requestTimeout: 20000
         });
     }
-    async getDocument(url) {
-        const request = App.createRequest({
+    async websiteRequest(url, referer = BASE_URL + '/') {
+        return App.createRequest({
             url,
             method: 'GET',
             headers: {
-                referer: BASE_URL + '/',
-                'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148'
+                referer,
+                'user-agent': await this.requestManager.getDefaultUserAgent()
             }
         });
+    }
+    // Baozimh can return a JSON verification response instead of its HTML.
+    // Only accept verification links on Baozimh's own verification path.
+    verificationChallenge(data) {
+        let body = data;
+        if (typeof data === 'string') {
+            try {
+                body = JSON.parse(data);
+            }
+            catch (_error) {
+                return undefined;
+            }
+        }
+        if (body?.error !== 'challenge_required')
+            return undefined;
+        const path = body.challenge_url;
+        const relativePath = typeof path === 'string' && path.startsWith(BASE_URL + '/')
+            ? path.slice(BASE_URL.length) : path;
+        const safePath = typeof relativePath === 'string'
+            && relativePath.startsWith('/__gatekeeper_challenge/')
+            && !/[\\\s]/.test(relativePath);
+        return { url: safePath ? BASE_URL + relativePath : BASE_URL + '/' };
+    }
+    checkWebsiteResponse(response) {
+        const data = response.data;
+        const htmlChallenge = typeof data === 'string'
+            && /\/__gatekeeper_challenge\/assets\/|\/cdn-cgi\/challenge-platform\/|id=["']challenge-form["']/i.test(data);
+        if (this.verificationChallenge(data) || htmlChallenge) {
+            throw new Error('包子漫畫需要瀏覽器驗證。請點選 Discover 右上角的雲朵圖示，在內建瀏覽器完成驗證，看到漫畫首頁後返回並重新整理。');
+        }
+        if (response.status === 401 || response.status === 403) {
+            throw new Error(`包子漫畫拒絕連線（HTTP ${response.status}）。請使用右上角的雲朵圖示開啟網站，確認能否正常瀏覽後再重新整理。`);
+        }
+        if (response.status === 429) {
+            throw new Error('包子漫畫暫時限制請求次數（HTTP 429）。請稍候再重新整理。');
+        }
+        if (response.status >= 400) {
+            throw new Error(`包子漫畫網站回應錯誤（HTTP ${response.status}）。請稍後再試。`);
+        }
+        if (data == null || (typeof data === 'string' && !data.trim())) {
+            throw new Error('包子漫畫回傳空白內容。請稍後再重新整理。');
+        }
+    }
+    async getCloudflareBypassRequestAsync() {
+        // Paperback uses this hook to open the site's normal verification UI.
+        // Resolve its link again because the WebView may use a new source instance.
+        const request = await this.websiteRequest(BASE_URL + '/');
+        try {
+            const response = await this.requestManager.schedule(request, 1);
+            const challenge = this.verificationChallenge(response.data);
+            if (challenge)
+                return App.createRequest({ ...request, url: challenge.url });
+        }
+        catch (_error) {
+            // The browser can still show the site's own error or verification page.
+        }
+        return request;
+    }
+    async getDocument(url) {
+        const request = await this.websiteRequest(url);
         const response = await this.requestManager.schedule(request, 1);
+        this.checkWebsiteResponse(response);
         return this.cheerio.load(response.data);
     }
     absoluteUrl(value) {
@@ -553,7 +614,7 @@ class Baozimh extends types_1.Source {
             }));
         });
         if (!seen.size)
-            throw new Error('Baozimh homepage returned no manga listings. Please try again later.');
+            throw new Error('包子漫畫首頁已回應，但找不到漫畫清單。請使用雲朵圖示確認網站內容；若首頁正常，請回報此錯誤以更新解析器。');
     }
     async getViewMoreItems(sectionId, metadata) {
         const section = sectionId.startsWith('home-') ? decodeURIComponent(sectionId.slice(5)) : '';
@@ -839,9 +900,8 @@ class Baozimh extends types_1.Source {
         const url = BASE_URL + '/api/bzmhq/amp_comic_list?' +
             ['type', 'region', 'state'].map(group => group + '=' + encodeURIComponent(values[group])).join('&') +
             '&filter=*&page=' + page + '&limit=36&language=tw';
-        const response = await this.requestManager.schedule(App.createRequest({
-            url, method: 'GET', headers: { referer: BASE_URL + '/classify' }
-        }), 1);
+        const response = await this.requestManager.schedule(await this.websiteRequest(url, BASE_URL + '/classify'), 1);
+        this.checkWebsiteResponse(response);
         const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
         if (!Array.isArray(data?.items))
             throw new Error('Baozimh returned an invalid catalog response. Please try again later.');
