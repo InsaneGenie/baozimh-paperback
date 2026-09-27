@@ -464,7 +464,7 @@ exports.Baozimh = exports.BaozimhInfo = void 0;
 const types_1 = require("@paperback/types");
 const BASE_URL = 'https://www.baozimh.com';
 exports.BaozimhInfo = {
-    version: '1.9.1',
+    version: '1.9.2',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -473,7 +473,9 @@ exports.BaozimhInfo = {
     contentRating: types_1.ContentRating.MATURE,
     websiteBaseURL: BASE_URL,
     sourceTags: [],
-    intents: types_1.SourceIntents.MANGA_CHAPTERS | types_1.SourceIntents.HOMEPAGE_SECTIONS
+    intents: types_1.SourceIntents.MANGA_CHAPTERS
+        | types_1.SourceIntents.HOMEPAGE_SECTIONS
+        | types_1.SourceIntents.CLOUDFLARE_BYPASS_REQUIRED
 };
 class Baozimh extends types_1.Source {
     constructor() {
@@ -520,10 +522,10 @@ class Baozimh extends types_1.Source {
         const htmlChallenge = typeof data === 'string'
             && /\/__gatekeeper_challenge\/assets\/|\/cdn-cgi\/challenge-platform\/|id=["']challenge-form["']/i.test(data);
         if (this.verificationChallenge(data) || htmlChallenge) {
-            throw new Error('包子漫畫需要瀏覽器驗證。請點選 Discover 右上角的雲朵圖示，在內建瀏覽器完成驗證，看到漫畫首頁後返回並重新整理。');
+            throw new Error('包子漫畫需要瀏覽器驗證。請使用 Paperback 的內建瀏覽器完成網站驗證，看到漫畫首頁後返回並重新整理。若找不到驗證入口，請回報 Paperback App 的版本。');
         }
         if (response.status === 401 || response.status === 403) {
-            throw new Error(`包子漫畫拒絕連線（HTTP ${response.status}）。請使用右上角的雲朵圖示開啟網站，確認能否正常瀏覽後再重新整理。`);
+            throw new Error(`包子漫畫拒絕連線（HTTP ${response.status}）。請使用 Paperback 的內建瀏覽器確認網站能否正常瀏覽，再返回並重新整理。`);
         }
         if (response.status === 429) {
             throw new Error('包子漫畫暫時限制請求次數（HTTP 429）。請稍候再重新整理。');
@@ -614,7 +616,7 @@ class Baozimh extends types_1.Source {
             }));
         });
         if (!seen.size)
-            throw new Error('包子漫畫首頁已回應，但找不到漫畫清單。請使用雲朵圖示確認網站內容；若首頁正常，請回報此錯誤以更新解析器。');
+            throw new Error('包子漫畫首頁已回應，但找不到漫畫清單。若網站首頁可正常瀏覽，請回報此錯誤以更新解析器。');
     }
     async getViewMoreItems(sectionId, metadata) {
         const section = sectionId.startsWith('home-') ? decodeURIComponent(sectionId.slice(5)) : '';
