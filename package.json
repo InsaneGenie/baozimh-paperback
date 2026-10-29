@@ -10,7 +10,7 @@
     "serve": "npx paperback serve",
     "dev": "npx nodemon --watch \"**/*.ts\" --ext \"js ts\" --exec \"npm run serve\"",
     "build": "tsc --outDir tmp/build",
-    "test:live": "npm run build && NODE_USE_ENV_PROXY=1 node --test --test-concurrency=1 test/live.test.js"
+    "test:live": "npm run build && node test/run-live.js"
   },
   "repository": {
     "type": "git",
