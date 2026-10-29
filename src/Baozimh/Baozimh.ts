@@ -22,7 +22,7 @@ const READER_URL = 'https://www.twmanga.com'
 const IMAGE_HOST = /^https?:\/\/[^/]*(?:bzcdn\.net|baozicdn\.com|static-tw\.baozimh\.com)\//i
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.9.4',
+    version: '1.9.5',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -389,17 +389,25 @@ export class Baozimh extends Source {
             return added
         }
 
+        // Kept so an empty chapter reports why its reader page failed (for
+        // example, the site's verification page) instead of a generic error.
+        let firstError: unknown
+        // Baozimh shows this notice instead of images for chapters it has
+        // taken down, so an empty result is the site's choice, not a parse bug.
+        let blocked = false
         for (const url of urls) {
             let $: any
             try {
                 $ = await this.getDocument(url)
             }
-            catch (_error) {
+            catch (error) {
                 // A generated continuation can legitimately be absent when a
                 // title has fewer sections. Keep the pages already collected.
+                firstError ??= error
                 continue
             }
             addPages($)
+            if ($('.empty_chapters_tips').length) blocked = true
             if (!discoverContinuations) continue
 
             // The manga page normally lists only 0_1.html. Baozimh stores the
@@ -434,7 +442,11 @@ export class Baozimh extends Source {
             }
         }
 
-        if (pages.length === 0) throw new Error('Baozimh returned no readable page images for this chapter.')
+        if (pages.length === 0) {
+            if (blocked) throw new Error('包子漫畫已屏蔽此章節（網站顯示資料缺失），網站上也無法閱讀。This chapter has been taken down by Baozimh.')
+            if (firstError) throw firstError
+            throw new Error('Baozimh returned no readable page images for this chapter.')
+        }
 
         return App.createChapterDetails({
             id: chapterId,
