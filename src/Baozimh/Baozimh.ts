@@ -22,7 +22,7 @@ const READER_URL = 'https://www.twmanga.com'
 const IMAGE_HOST = /^https?:\/\/[^/]*(?:bzcdn\.net|baozicdn\.com|static-tw\.baozimh\.com)\//i
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.9.3',
+    version: '1.9.4',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -57,7 +57,10 @@ export class Baozimh extends Source {
                     headers['referer'] = BASE_URL + '/'
                 }
                 if (!hasHeader('user-agent')) headers['user-agent'] = await this.requestManager.getDefaultUserAgent()
-                return App.createRequest({ ...request, headers })
+                // Paperback's Request is a native object, so spreading it into
+                // createRequest drops its url. Update its headers in place.
+                request.headers = headers
+                return request
             },
             interceptResponse: async (response: Response): Promise<Response> => response
         }
@@ -120,7 +123,7 @@ export class Baozimh extends Source {
         try {
             const response = await this.requestManager.schedule(request, 1)
             const challenge = this.verificationChallenge(response.data)
-            if (challenge) return App.createRequest({ ...request, url: challenge.url })
+            if (challenge) return this.websiteRequest(challenge.url)
         }
         catch (_error) {
             // The browser can still show the site's own error or verification page.
