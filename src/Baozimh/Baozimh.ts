@@ -22,7 +22,7 @@ const READER_URL = 'https://www.twmanga.com'
 const IMAGE_HOST = /^https?:\/\/[^/]*(?:bzcdn\.net|baozicdn\.com|static-tw\.baozimh\.com)\//i
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.9.4',
+    version: '1.9.5',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
