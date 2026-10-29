@@ -468,7 +468,7 @@ const READER_URL = 'https://www.twmanga.com';
 // Page images and covers come from Baozimh's CDN hosts (for example s1.bzcdn.net).
 const IMAGE_HOST = /^https?:\/\/[^/]*(?:bzcdn\.net|baozicdn\.com|static-tw\.baozimh\.com)\//i;
 exports.BaozimhInfo = {
-    version: '1.9.3',
+    version: '1.9.4',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -506,7 +506,10 @@ class Baozimh extends types_1.Source {
                     }
                     if (!hasHeader('user-agent'))
                         headers['user-agent'] = await this.requestManager.getDefaultUserAgent();
-                    return App.createRequest({ ...request, headers });
+                    // Paperback's Request is a native object, so spreading it into
+                    // createRequest drops its url. Update its headers in place.
+                    request.headers = headers;
+                    return request;
                 },
                 interceptResponse: async (response) => response
             }
@@ -572,7 +575,7 @@ class Baozimh extends types_1.Source {
             const response = await this.requestManager.schedule(request, 1);
             const challenge = this.verificationChallenge(response.data);
             if (challenge)
-                return App.createRequest({ ...request, url: challenge.url });
+                return this.websiteRequest(challenge.url);
         }
         catch (_error) {
             // The browser can still show the site's own error or verification page.
