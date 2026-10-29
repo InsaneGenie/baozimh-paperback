@@ -16,9 +16,13 @@ import {
 } from '@paperback/types'
 
 const BASE_URL = 'https://www.baozimh.com'
+// Chapter pages are served from the TWManga reader domain.
+const READER_URL = 'https://www.twmanga.com'
+// Page images and covers come from Baozimh's CDN hosts (for example s1.bzcdn.net).
+const IMAGE_HOST = /^https?:\/\/[^/]*(?:bzcdn\.net|baozicdn\.com|static-tw\.baozimh\.com)\//i
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.9.2',
+    version: '1.9.3',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -35,7 +39,28 @@ export const BaozimhInfo: SourceInfo = {
 export class Baozimh extends Source {
     requestManager = App.createRequestManager({
         requestsPerSecond: 2,
-        requestTimeout: 20000
+        requestTimeout: 30000,
+        interceptor: {
+            // Paperback also routes reader page images through this hook.
+            // Baozimh's image CDN (bzcdn) throttles hotlinked requests that
+            // arrive without the reader's Referer, which made later pages in
+            // a chapter time out after the first few loaded.
+            interceptRequest: async (request: Request): Promise<Request> => {
+                const headers: Record<string, string> = { ...(request.headers ?? {}) }
+                const hasHeader = (name: string): boolean =>
+                    Object.keys(headers).some((key) => key.toLowerCase() === name)
+                if (IMAGE_HOST.test(request.url)) {
+                    if (!hasHeader('referer')) headers['referer'] = READER_URL + '/'
+                    if (!hasHeader('accept')) headers['accept'] = 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+                }
+                else if (!hasHeader('referer')) {
+                    headers['referer'] = BASE_URL + '/'
+                }
+                if (!hasHeader('user-agent')) headers['user-agent'] = await this.requestManager.getDefaultUserAgent()
+                return App.createRequest({ ...request, headers })
+            },
+            interceptResponse: async (response: Response): Promise<Response> => response
+        }
     })
 
     private async websiteRequest(url: string, referer = BASE_URL + '/'): Promise<Request> {
