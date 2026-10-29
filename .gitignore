@@ -3,3 +3,4 @@ lib/
 bundles/
 .DS_Store
 npm-debug.log*
+tmp/
