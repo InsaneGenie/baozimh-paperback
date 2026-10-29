@@ -90,4 +90,17 @@ test('verification pages raise a readable error', async () => {
     assert.equal(request.url, 'https://www.baozimh.com/')
 })
 
+test('a chapter whose reader page fails reports the real reason', async () => {
+    const reader = 'https://www.twmanga.com/comic/chapter/demo/0_1.html'
+    pagesByUrl = { [reader]: '{"error":"challenge_required","challenge_url":"/__gatekeeper_challenge/x"}' }
+    const id = encodeURIComponent(JSON.stringify([reader, reader.replace('.html', '_2.html')]))
+    await assert.rejects(source.getChapterDetails('demo', id), /瀏覽器驗證/)
+})
+
+test('a chapter the site has taken down says so', async () => {
+    const reader = 'https://www.twmanga.com/comic/chapter/demo/0_1.html'
+    pagesByUrl = { [reader]: '<div class="comic-contain"><div class="l-content empty_chapters_tips">屏蔽</div></div>' }
+    await assert.rejects(source.getChapterDetails('demo', encodeURIComponent(JSON.stringify([reader]))), /屏蔽此章節/)
+})
+
 test.afterEach(() => { requestLog.length = 0 })
