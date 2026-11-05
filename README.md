@@ -1,6 +1,6 @@
-# Baozimh for Paperback
+# Baozimh and Manhuagui for Paperback
 
-A third-party Paperback source extension for Baozimh (包子漫畫), built for both Paperback 0.8 and Paperback 0.9.
+Third-party Paperback source extensions for Baozimh (包子漫畫) and Manhuagui (看漫画), built for both Paperback 0.8 and Paperback 0.9. Both sources are in the same repository, so adding it once gives you both.
 
 ## Install
 
@@ -22,10 +22,21 @@ Baozimh shows a "verifying your browser" check before its pages. On 0.8, open th
 - Chapter page extraction with vertical-reader support
 - GitHub Actions publishing both builds to `gh-pages`
 
+## Manhuagui
+
+- Discover rows: 人气最旺, 最新更新, 最新上架, 评分最高 (each pages through the full catalog), plus genres on 0.9
+- Search by title, or on 0.8 browse by region, genre, audience and status tags (one per group)
+- Chapters keep Manhuagui's sections (单话, 单行本, 番外篇); unnumbered extras such as 公告 are numbered just after the chapter before them (for example 12.1)
+- Adult titles, whose chapter list the site hides behind a warning, are read from the compressed list the page ships
+- Chapter images are decoded from the reader's packed, LZString-compressed script and loaded from `i.hamreus.com` with the Referer the image host requires
+
+Manhuagui blocks addresses that load pages too quickly, so the source sends at most one page request per second. `npm run test:live:manhuagui` checks every step against the live site and saves the fetched pages under `tmp/manhuagui-live/`.
+
 ## Layout
 
-- `src/Baozimh/Baozimh.ts`: the Paperback 0.8 source (`npm test` in the repository root).
-- `paperback-0.9/`: the Paperback 0.9 source with its own toolchain (`npm test` inside that folder; needs Node 24).
+- `src/Baozimh/Baozimh.ts`, `src/Manhuagui/`: the Paperback 0.8 sources (`npm test` in the repository root).
+- `paperback-0.9/`: the Paperback 0.9 sources with their own toolchain (`npm test` inside that folder; needs Node 24).
+- `src/Manhuagui/helpers.ts` and `paperback-0.9/src/Manhuagui/helpers.ts` are identical copies; change both.
 
 ## Notes
 
