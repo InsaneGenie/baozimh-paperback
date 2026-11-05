@@ -58,6 +58,35 @@ test('chapter list groups multi-part chapters and keeps every part', async () =>
         [['第1話', 1, 1], ['第2話', 2, 2], ['第3話', 3, 1]])
 })
 
+test('extras keep their own entry and do not take a real chapter number', async () => {
+    // Shape of 宦妃天下: unnumbered extras sit between numbered chapters, and
+    // the latest chapters are repeated in a second block.
+    const list = [
+        chapterLink(176, 0, '第175話 藍翎之死'),
+        chapterLink(177, 0, '公告~來抽獎啦！'),
+        chapterLink(178, 0, '第176話 他不是太監？！'),
+        chapterLink(180, 0, '第180話 藍大夫人死了'),
+        chapterLink(200, 0, '聖誕快樂！情頭來惹！'),
+        chapterLink(201, 0, '元旦快樂！'),
+        chapterLink(202, 0, '第202話 你是男人嗎'),
+        chapterLink(203, 0, '番外2 小劇場'),
+        chapterLink(204, 0, '第一百零三話 舊章')
+    ]
+    pagesByUrl = { 'https://www.baozimh.com/comic/demo': `<div>${list.join('')}</div><div>${list.slice(-3).join('')}</div>` }
+    const chapters = await source.getChapters('demo')
+    assert.deepEqual(chapters.map((c) => [c.chapNum, c.name, JSON.parse(decodeURIComponent(c.id)).length]), [
+        [175, '第175話 藍翎之死', 1],
+        [175.1, '公告~來抽獎啦！', 1],
+        [176, '第176話 他不是太監？！', 1],
+        [180, '第180話 藍大夫人死了', 1],
+        [180.1, '聖誕快樂！情頭來惹！', 1],
+        [180.2, '元旦快樂！', 1],
+        [202, '第202話 你是男人嗎', 1],
+        [202.1, '番外2 小劇場', 1],
+        [103, '第一百零三話 舊章', 1]
+    ])
+})
+
 test('chapter pages are collected across parts without duplicates', async () => {
     const reader = 'https://www.twmanga.com/comic/chapter/demo/0_1'
     const page = (n) => `<amp-img class="comic-contain__item" src="https://s1.bzcdn.net/scomic/demo/0/1/${n}.jpg"></amp-img>`
