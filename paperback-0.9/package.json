@@ -1,13 +1,13 @@
 {
   "name": "Baozimh Extensions",
   "private": true,
-  "description": "Baozimh source extension for Paperback 0.9",
+  "description": "Baozimh and Manhuagui source extensions for Paperback 0.9",
   "type": "module",
   "scripts": {
     "tsc": "tsc",
     "bundle": "paperback-cli bundle",
     "serve": "paperback-cli serve",
-    "test": "tsc && paperback-cli bundle && node --test test/bundle.test.js"
+    "test": "tsc && paperback-cli bundle && node --test test/bundle.test.js test/manhuagui.test.js"
   },
   "devDependencies": {
     "@paperback/toolchain": "1.0.0-alpha.92",

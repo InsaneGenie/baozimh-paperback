@@ -76,10 +76,10 @@ global.App = {
     createChapterDetails: identity
 }
 
-function loadSource() {
-    const compiled = path.join(__dirname, '..', 'tmp', 'build', 'Baozimh', 'Baozimh.js')
-    const { Baozimh } = require(compiled)
-    return new Baozimh(cheerio)
+function loadSource(name = 'Baozimh') {
+    const compiled = path.join(__dirname, '..', 'tmp', 'build', name, name + '.js')
+    const Source = require(compiled)[name]
+    return new Source(cheerio)
 }
 
 module.exports = {

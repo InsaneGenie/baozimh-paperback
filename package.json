@@ -2,15 +2,16 @@
   "name": "baozimh-paperback",
   "version": "1.0.0",
   "repositoryName": "Baozimh Extensions",
-  "description": "Baozimh source extension for Paperback 0.8",
+  "description": "Baozimh and Manhuagui source extensions for Paperback 0.8",
   "main": "lib/index.js",
   "scripts": {
-    "test": "npm run build && node --test test/unit.test.js",
+    "test": "npm run build && node --test test/unit.test.js test/manhuagui.test.js",
     "bundle": "npx paperback bundle",
     "serve": "npx paperback serve",
     "dev": "npx nodemon --watch \"**/*.ts\" --ext \"js ts\" --exec \"npm run serve\"",
     "build": "tsc --outDir tmp/build",
-    "test:live": "npm run build && node test/run-live.js"
+    "test:live": "npm run build && node test/run-live.js",
+    "test:live:manhuagui": "npm run build && node test/manhuagui-live.js"
   },
   "repository": {
     "type": "git",
