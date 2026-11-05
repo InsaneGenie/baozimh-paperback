@@ -70,7 +70,9 @@ test('extras keep their own entry and do not take a real chapter number', async 
         chapterLink(201, 0, '元旦快樂！'),
         chapterLink(202, 0, '第202話 你是男人嗎'),
         chapterLink(203, 0, '番外2 小劇場'),
-        chapterLink(204, 0, '第一百零三話 舊章')
+        chapterLink(204, 0, '第一百零三話 舊章'),
+        chapterLink(205, 0, '第303 新帝登基'),
+        chapterLink(206, 0, '第十二季 預告')
     ]
     pagesByUrl = { 'https://www.baozimh.com/comic/demo': `<div>${list.join('')}</div><div>${list.slice(-3).join('')}</div>` }
     const chapters = await source.getChapters('demo')
@@ -83,7 +85,9 @@ test('extras keep their own entry and do not take a real chapter number', async 
         [180.2, '元旦快樂！', 1],
         [202, '第202話 你是男人嗎', 1],
         [202.1, '番外2 小劇場', 1],
-        [103, '第一百零三話 舊章', 1]
+        [103, '第一百零三話 舊章', 1],
+        [303, '第303 新帝登基', 1],
+        [303.1, '第十二季 預告', 1]
     ])
 })
 

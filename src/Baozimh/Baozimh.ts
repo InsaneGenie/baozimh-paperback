@@ -254,11 +254,13 @@ export class Baozimh extends Source {
         })
     }
 
-    // Reads the number from labels such as “第131話”, “第一百話” or “12 標題”.
+    // Reads the number from labels such as “第131話”, “第一百話”, “第303 標題” or “12 標題”.
     // Extras such as “公告” or “元旦快樂！” have none; a digit elsewhere in a
     // title (for example “番外2”) must not be mistaken for a chapter number.
     private chapterNumberFromName(name: string): number | undefined {
-        const marked = name.match(/第\s*([\d.]+|[零〇一二兩三四五六七八九十百千]+)\s*[話话回章集]/)?.[1]
+        // The suffix is sometimes left out (“第303 新帝登基”), but 第3季 or
+        // 第2部 name a season, not a chapter.
+        const marked = name.match(/第\s*(\d+(?:\.\d+)?|[零〇一二兩三四五六七八九十百千]+)\s*(?:[話话回章集]|(?![\d.季部卷零〇一二兩三四五六七八九十百千]))/)?.[1]
             ?? name.match(/^\s*(\d+(?:\.\d+)?)(?![\d.])/)?.[1]
         if (!marked) return undefined
         if (/^\d/.test(marked)) {
