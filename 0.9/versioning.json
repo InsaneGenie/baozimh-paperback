@@ -1,12 +1,12 @@
 {
-  "buildTime": "2026-11-05T03:14:22.666Z",
+  "buildTime": "2026-11-05T05:07:57.876Z",
   "builtWith": {
     "toolchain": "1.0.0-alpha.92",
     "types": "1.0.0-alpha.92"
   },
   "repository": {
     "name": "Baozimh Extensions",
-    "description": "Baozimh source extension for Paperback 0.9"
+    "description": "Baozimh and Manhuagui source extensions for Paperback 0.9"
   },
   "sources": [
     {
@@ -30,6 +30,28 @@
         }
       ],
       "id": "Baozimh"
+    },
+    {
+      "name": "Manhuagui",
+      "description": "Read Chinese manga from Manhuagui (看漫画).",
+      "version": "1.0.0",
+      "icon": "icon.png",
+      "language": "zh",
+      "contentRating": "MATURE",
+      "capabilities": [
+        1,
+        16,
+        4,
+        64
+      ],
+      "badges": [],
+      "developers": [
+        {
+          "name": "Steven Lai",
+          "github": "https://github.com/InsaneGenie"
+        }
+      ],
+      "id": "Manhuagui"
     }
   ]
 }
