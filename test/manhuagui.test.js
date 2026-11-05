@@ -60,10 +60,10 @@ test('chapters are numbered per section, extras follow their chapter', async () 
               </div>
               <h4><span>单行本</span></h4>
               <div class="chapter-list cf mt10" id="chapter-list-1">
-                <ul>${chapter(1001, 4002, '第02卷')}${chapter(1001, 4001, '第01卷')}</ul>
+                <ul>${chapter(1001, 4002, '第02卷')}${chapter(1001, 4001, '第01卷')}${chapter(1001, 3500, '02卷附录')}</ul>
               </div>
               <h4><span>番外篇</span></h4>
-              <div class="chapter-list cf mt10" id="chapter-list-2"><ul>${chapter(1001, 6001, '番外2 小剧场')}</ul></div>
+              <div class="chapter-list cf mt10" id="chapter-list-2"><ul>${chapter(1001, 6001, '番外2 小剧场')}${chapter(1001, 6002, '番外06')}${chapter(1001, 6003, '特别篇')}</ul></div>
             </div>`
     }
     const chapters = await source.getChapters('1001')
@@ -72,9 +72,12 @@ test('chapters are numbered per section, extras follow their chapter', async () 
         ['5001', 2, undefined, '单话', '第2话'],
         ['5002', 2.1, undefined, '单话', '休刊公告'],
         ['5003', 3, undefined, '单话', '第3话'],
+        ['3500', 2.1, undefined, '单行本', '02卷附录'],
         ['4001', 1, 1, '单行本', '第01卷'],
         ['4002', 2, 2, '单行本', '第02卷'],
-        ['6001', 0.1, undefined, '番外篇', '番外2 小剧场']
+        ['6001', 2, undefined, '番外篇', '番外2 小剧场'],
+        ['6002', 6, undefined, '番外篇', '番外06'],
+        ['6003', 6.1, undefined, '番外篇', '特别篇']
     ])
 })
 

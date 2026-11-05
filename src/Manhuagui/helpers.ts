@@ -189,9 +189,22 @@ export function numberChapters(links: ChapterLink[]): NumberedChapter[] {
         const inGroup = links.filter((link) => link.group === group)
             .sort((a, b) => Number(a.id) - Number(b.id))
         const isVolumes = /单行本|單行本|卷/.test(group)
+        // A section of extras (番外篇) numbers its entries on its own, so
+        // “番外06” is 6 there.
+        const isExtras = /番外|特别|特別|外传|外傳/.test(group)
         let previous = 0, extras = 0
         for (const link of inGroup) {
+            // An appendix such as “20卷附录” belongs right after volume 20.
+            const appendixOf = link.name.match(/^\s*(?:第\s*)?(\d+(?:\.\d+)?)\s*[卷冊册话話回]\s*(?:附[录錄]|特典|番外|彩[页頁]|特[别別]篇)/)?.[1]
+            if (appendixOf !== undefined) {
+                result.push({ ...link, chapNum: Math.round((Number(appendixOf) + 0.1) * 10) / 10 })
+                continue
+            }
             const number = chapterNumberFromName(link.name)
+                ?? (isExtras ? (() => {
+                    const value = Number.parseFloat(link.name.match(/\d+(?:\.\d+)?/)?.[0] ?? '')
+                    return Number.isFinite(value) ? value : undefined
+                })() : undefined)
             let chapNum: number
             if (number !== undefined) {
                 previous = number
