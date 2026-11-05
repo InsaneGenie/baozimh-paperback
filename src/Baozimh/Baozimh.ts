@@ -22,7 +22,7 @@ const READER_URL = 'https://www.twmanga.com'
 const IMAGE_HOST = /^https?:\/\/[^/]*(?:bzcdn\.net|baozicdn\.com|static-tw\.baozimh\.com)\//i
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.9.5',
+    version: '1.9.6',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -254,9 +254,35 @@ export class Baozimh extends Source {
         })
     }
 
+    // Reads the number from labels such as “第131話”, “第一百話”, “第303 標題” or “12 標題”.
+    // Extras such as “公告” or “元旦快樂！” have none; a digit elsewhere in a
+    // title (for example “番外2”) must not be mistaken for a chapter number.
+    private chapterNumberFromName(name: string): number | undefined {
+        // The suffix is sometimes left out (“第303 新帝登基”), but 第3季 or
+        // 第2部 name a season, not a chapter.
+        const marked = name.match(/第\s*(\d+(?:\.\d+)?|[零〇一二兩三四五六七八九十百千]+)\s*(?:[話话回章集]|(?![\d.季部卷零〇一二兩三四五六七八九十百千]))/)?.[1]
+            ?? name.match(/^\s*(\d+(?:\.\d+)?)(?![\d.])/)?.[1]
+        if (!marked) return undefined
+        if (/^\d/.test(marked)) {
+            const value = Number.parseFloat(marked)
+            return Number.isFinite(value) ? value : undefined
+        }
+        const digits: Record<string, number> = {零: 0, 〇: 0, 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9}
+        const units: Record<string, number> = {十: 10, 百: 100, 千: 1000}
+        let total = 0, digit = 0
+        for (const char of marked) {
+            if (char in digits) digit = digits[char]!
+            else {
+                total += (digit || 1) * units[char]!
+                digit = 0
+            }
+        }
+        return total + digit || undefined
+    }
+
     async getChapters(mangaId: string): Promise<Chapter[]> {
         const $ = await this.getDocument(`${BASE_URL}/comic/${mangaId}`)
-        const chapterGroups = new Map<string, { urls: string[]; name: string; chapNum: number }>()
+        const entries: { url: string; name: string; slot: number; section: number; number: number | undefined }[] = []
         const seen = new Set<string>()
 
         $('a.comics-chapters__item, a[href*="/user/page_direct?"]').each((_index: number, element: any) => {
@@ -264,37 +290,63 @@ export class Baozimh extends Source {
             const slotText = href.match(/[?&]chapter_slot=(\d+)/)?.[1]
             const sectionSlot = href.match(/[?&]section_slot=(\d+)/)?.[1]
             // Every split section shares chapter_slot; section_slot identifies
-            // the individual reader URL. Deduplicating by chapter_slot alone
-            // silently removed parts 2–4 before they could be grouped.
+            // the individual reader URL. The page also repeats the latest
+            // chapters in a second block, which this removes.
             const dedupeKey = slotText
                 ? `slot:${slotText}:section:${sectionSlot ?? href}`
                 : href
             if (!href || seen.has(dedupeKey)) return
             seen.add(dedupeKey)
-
             const name = $(element).text().replace(/\s+/g, ' ').trim()
-            const numberText = name.match(/(?:第\s*)?(\d+(?:\.\d+)?)/)?.[1]
-            const chapterNumber = Number.parseFloat(numberText ?? slotText ?? String(chapterGroups.size + 1))
+            entries.push({
+                url: this.absoluteUrl(href),
+                name,
+                slot: slotText ? Number(slotText) : entries.length,
+                section: sectionSlot ? Number(sectionSlot) : 0,
+                number: this.chapterNumberFromName(name)
+            })
+        })
 
+        // Extras have no number of their own. Number them just after the
+        // chapter published before them (slot order is publication order), so
+        // “公告” after 第175話 becomes 175.1 instead of taking its list position
+        // and colliding with a real chapter.
+        const extraNumbers = new Map<typeof entries[number], number>()
+        let previous = 0, extrasAfterPrevious = 0
+        for (const entry of [...entries].sort((a, b) => a.slot - b.slot || a.section - b.section)) {
+            if (entry.number !== undefined) {
+                previous = entry.number
+                extrasAfterPrevious = 0
+            }
+            else {
+                extrasAfterPrevious++
+                extraNumbers.set(entry, Math.round((previous + Math.min(extrasAfterPrevious, 9) / 10) * 10) / 10)
+            }
+        }
+
+        const chapterGroups = new Map<string, { urls: string[]; name: string; chapNum: number }>()
+        for (const entry of entries) {
             // Baozimh sometimes publishes one chapter as several adjacent reader
             // URLs (for example, part 1/4 through part 4/4). Keep those parts in
             // one Paperback chapter instead of making the reader stop after part 1.
-            const groupName = name
+            // Parts are labelled inconsistently, so the chapter number is the
+            // grouping key. Extras are never grouped with anything else.
+            const key = entry.number !== undefined ? `number:${entry.number}` : `slot:${entry.slot}`
+            const group = chapterGroups.get(key)
+            if (group) {
+                group.urls.push(entry.url)
+                continue
+            }
+            const groupName = entry.name
                 .replace(/\s*[（(]\s*\d+\s*(?:[/／]|of)\s*\d+\s*[）)]\s*$/i, '')
                 .replace(/\s*[-_－]\s*\d+\s*$/, '')
                 .trim()
-            // Baozimh may label parts differently (for example, “1”, “1-2”,
-            // or “第一話（下）”), so the chapter number—not the displayed part
-            // text—is the stable grouping key.
-            const key = String(Number.isFinite(chapterNumber) ? chapterNumber : chapterGroups.size + 1)
-            const group = chapterGroups.get(key)
-            if (group) group.urls.push(this.absoluteUrl(href))
-            else chapterGroups.set(key, {
-                urls: [this.absoluteUrl(href)],
-                name: groupName || name,
-                chapNum: Number.isFinite(chapterNumber) ? chapterNumber : chapterGroups.size + 1
+            chapterGroups.set(key, {
+                urls: [entry.url],
+                name: groupName || entry.name,
+                chapNum: entry.number ?? extraNumbers.get(entry)!
             })
-        })
+        }
 
         return Array.from(chapterGroups.values()).map((group) => App.createChapter({
             id: encodeURIComponent(JSON.stringify(group.urls)),
