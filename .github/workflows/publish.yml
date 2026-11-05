@@ -28,8 +28,29 @@ jobs:
           ref: gh-pages
           path: bundles
 
+      # Paperback 0.8 repository: https://insanegenie.github.io/baozimh-paperback/main
       - run: npm ci
       - run: npm run bundle -- --folder=main
+
+      # Paperback 0.9 repository: https://insanegenie.github.io/baozimh-paperback/0.9
+      # Its toolchain needs Node 24 and lives in its own folder.
+      - name: Set up Node.js for Paperback 0.9
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: paperback-0.9/package-lock.json
+
+      - name: Build and test the Paperback 0.9 source
+        working-directory: paperback-0.9
+        run: |
+          npm ci
+          npm test
+
+      - name: Add the Paperback 0.9 bundle
+        run: |
+          rm -rf bundles/0.9
+          cp -r paperback-0.9/bundles bundles/0.9
 
       - name: Publish GitHub Pages branch
         uses: JamesIves/github-pages-deploy-action@v4
