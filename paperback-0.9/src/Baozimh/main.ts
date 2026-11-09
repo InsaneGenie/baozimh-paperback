@@ -23,6 +23,8 @@ import {
 } from '@paperback/types'
 import * as cheerio from 'cheerio'
 
+import { CatalogFilterForm } from '../shared/CatalogFilterForm'
+
 import { chapterNumberFromName, verificationUrl } from './helpers'
 import type BaozimhConfig from './pbconfig'
 
@@ -463,6 +465,16 @@ export class BaozimhExtension implements ExtensionImpl<typeof BaozimhConfig> {
                 tags: Array.from(tags, ([id, title]): Tag => ({ id, title }))
             }
         })
+    }
+
+    // Paperback 0.9 shows the tag/filter sheet only when the source supplies this form.
+    async getAdvancedSearchForm(query: SearchQuery<any>): Promise<CatalogFilterForm> {
+        const groups = this.getFilterTags().then((sections) => sections.map((section) => ({
+            id: section.id,
+            title: section.title,
+            options: section.tags.map((tag) => ({ id: tag.id, title: tag.title }))
+        })))
+        return new CatalogFilterForm(query.metadata, groups)
     }
 
     private async getCatalogPage(values: CatalogFilters, page: number): Promise<{ cards: Card[]; hasMore: boolean }> {

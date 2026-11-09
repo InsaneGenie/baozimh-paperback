@@ -21,6 +21,8 @@ import {
 } from '@paperback/types'
 import * as cheerio from 'cheerio'
 
+import { ANY_FILTER, CatalogFilterForm, type FilterGroup } from '../shared/CatalogFilterForm'
+
 import {
     chapterImageData,
     chapterImageUrls,
@@ -56,6 +58,32 @@ const GENRES: [string, string][] = [
     ['sige', '四格'], ['zhichang', '职场'], ['zhentan', '侦探'], ['shehui', '社会'], ['yinyue', '音乐'],
     ['wudao', '舞蹈'], ['zazhi', '杂志'], ['heidao', '黑道']
 ]
+
+// Catalog filters, in the order Manhuagui joins them in /list/<a>_<b>_<c>/.
+const FILTER_GROUPS: FilterGroup[] = [
+    ['region', '地区', [['japan', '日本'], ['hongkong', '港台'], ['other', '其它'], ['europe', '欧美'], ['china', '内地'], ['korea', '韩国']]],
+    ['genre', '题材', GENRES],
+    ['audience', '受众', [['shaonv', '少女'], ['shaonian', '少年'], ['qingnian', '青年'], ['ertong', '儿童'], ['tongyong', '通用']]],
+    ['status', '进度', [['lianzai', '连载'], ['wanjie', '完结']]]
+].map(([id, title, options]) => ({
+    id: id as string,
+    title: title as string,
+    options: (options as [string, string][]).map(([value, label]) => ({ id: value, title: label }))
+}))
+
+// Turns filter metadata ({ genre: 'rexue', region: 'japan', ... }) into a /list/ path; undefined when nothing valid is set.
+function catalogPath(metadata: any): string | undefined {
+    if (!metadata || typeof metadata !== 'object') return undefined
+    let any = false
+    const parts: string[] = []
+    for (const group of FILTER_GROUPS) {
+        const value = metadata[group.id]
+        if (typeof value !== 'string') continue
+        any = true
+        if (value !== ANY_FILTER && group.options.some((option) => option.id === value)) parts.push(value)
+    }
+    return any ? parts.join('_') : undefined
+}
 
 type Card = { mangaId: string; title: string; imageUrl: string; subtitle?: string }
 
@@ -286,14 +314,19 @@ export class ManhuaguiExtension implements ExtensionImpl<typeof ManhuaguiConfig>
         return { id: chapter.chapterId, mangaId, pages }
     }
 
+    // Paperback 0.9 shows the tag/filter sheet only when the source supplies this form.
+    async getAdvancedSearchForm(query: SearchQuery<any>): Promise<CatalogFilterForm> {
+        return new CatalogFilterForm(query.metadata, FILTER_GROUPS)
+    }
+
     async getSearchResults(query: SearchQuery<any>, metadata: any): Promise<PagedResults<SearchResultItem>> {
         const page = Number.isInteger(metadata?.page) && metadata.page > 0 ? metadata.page : 1
         const title = query.title?.trim() ?? ''
 
-        // A genre picked on Discover arrives as a catalog filter.
-        const genre = query.metadata?.genre
-        if (!title && typeof genre === 'string' && GENRES.some(([id]) => id === genre)) {
-            const result = await this.getListPage(genre, 'view', page)
+        // A genre picked on Discover, or the search filter sheet, arrives as catalog filters.
+        const path = title ? undefined : catalogPath(query.metadata)
+        if (path !== undefined) {
+            const result = await this.getListPage(path, 'view', page)
             return { items: result.cards.map((card) => ({ ...card })), metadata: result.hasMore ? { page: page + 1 } : undefined }
         }
 

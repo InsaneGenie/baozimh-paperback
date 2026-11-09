@@ -126,3 +126,21 @@ test('title search', async () => {
     assert.deepEqual(plain(result.items.map((item) => [item.mangaId, item.title])), [['1001', '示例漫画']])
     assert.equal(result.metadata, undefined)
 })
+
+test('the search filter sheet builds a catalog path from the picks', async () => {
+    const list = `<ul id="contList"><li><a class="bcover" href="/comic/1001/" title="示例漫画"><img src="//cf.mhgui.com/cpic/b/1001.jpg"></a></li></ul>`
+    const { extension, sent } = loadExtension(html({
+        'https://www.manhuagui.com/list/japan_rexue_wanjie/view_p1.html': list
+    }))
+    await extension.initialise()
+    const form = await extension.getAdvancedSearchForm({ title: '' })
+    const sections = form.getSections()
+    assert.deepEqual(plain(sections.map((section) => section.header)), ['地区', '题材', '受众', '进度'])
+    await sections[0].items.find((item) => item.title === '日本').onSelect()
+    await form.getSections()[1].items.find((item) => item.title === '热血').onSelect()
+    await form.getSections()[3].items.find((item) => item.title === '完结').onSelect()
+    const metadata = form.getSearchQueryMetadata()
+    const result = await extension.getSearchResults({ title: '', metadata }, undefined)
+    assert.equal(result.items[0].mangaId, '1001')
+    assert.equal(sent.at(-1).url, 'https://www.manhuagui.com/list/japan_rexue_wanjie/view_p1.html')
+})
