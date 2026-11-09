@@ -22,7 +22,7 @@ const READER_URL = 'https://www.twmanga.com'
 const IMAGE_HOST = /^https?:\/\/[^/]*(?:bzcdn\.net|baozicdn\.com|static-tw\.baozimh\.com)\//i
 
 export const BaozimhInfo: SourceInfo = {
-    version: '1.9.6',
+    version: '1.9.7',
     name: 'Baozimh',
     icon: 'icon.png',
     author: 'Steven Lai',
@@ -206,7 +206,7 @@ export class Baozimh extends Source {
         }
         if (Object.prototype.hasOwnProperty.call(catalogFilters, section)) {
             // These are broader matching catalogs, not additional curated recommendations.
-            return this.getCatalogPage({type: 'all', region: 'all', state: 'all', ...catalogFilters[section]}, metadata)
+            return this.getCatalogPage({type: 'all', region: 'all', state: 'all', filter: '*', ...catalogFilters[section]}, metadata)
         }
         if (section === '最新上架') {
             const $ = await this.getDocument(BASE_URL + '/list/new')
@@ -509,21 +509,27 @@ export class Baozimh extends Source {
 
     override async getSearchTags(): Promise<TagSection[]> {
         const $ = await this.getDocument(BASE_URL + '/classify')
-        return ['type', 'region', 'state'].map((group) => {
+        const sections: TagSection[] = []
+        // 'filter' is the title's first letter (A–Z); that row is optional.
+        for (const group of ['type', 'region', 'state', 'filter']) {
             const tags = new Map<string, string>()
             $('a[href*="/classify?"]').each((_index: number, element: any) => {
                 const href = $(element).attr('href') ?? ''
-                const value = href.match(new RegExp('[?&]' + group + '=([^&]+)'))?.[1]
+                const value = href.match(new RegExp('[?&]' + group + '=([^&#]+)'))?.[1]
                 const label = $(element).text().trim()
-                if (value && value !== 'all' && label && /^[a-z]+$/.test(value)) tags.set(value, label)
+                if (value && value !== 'all' && value !== '*' && label && /^[a-z0-9_-]+$/i.test(value)) tags.set(value, label)
             })
-            if (!tags.size) throw new Error('Baozimh returned no search filters. Please try again later.')
-            return App.createTagSection({
+            if (!tags.size) {
+                if (group === 'filter') continue
+                throw new Error('Baozimh returned no search filters. Please try again later.')
+            }
+            sections.push(App.createTagSection({
                 id: group,
-                label: ({type: '題材（選一項）', region: '地區（選一項）', state: '狀態（選一項）'} as Record<string, string>)[group]!,
+                label: ({type: '題材（選一項）', region: '地區（選一項）', state: '狀態（選一項）', filter: '字母（選一項）'} as Record<string, string>)[group]!,
                 tags: Array.from(tags, ([value, label]) => App.createTag({id: group + ':' + value, label}))
-            })
-        })
+            }))
+        }
+        return sections
     }
 
     override async getTags(): Promise<TagSection[]> { return this.getSearchTags() }
@@ -532,12 +538,12 @@ export class Baozimh extends Source {
 
     private async searchByTags(query: SearchRequest, metadata: any): Promise<PagedResults> {
         if (query.title?.trim()) throw new Error('使用標籤時請清空搜尋文字。Clear the search text to browse by tags.')
-        const values: Record<string, string> = {type: 'all', region: 'all', state: 'all'}
+        const values: Record<string, string> = {type: 'all', region: 'all', state: 'all', filter: '*'}
         for (const tag of query.includedTags ?? []) {
-            const match = /^(type|region|state):([a-z]+)$/.exec(tag.id)
+            const match = /^(type|region|state|filter):([a-z0-9_-]+)$/i.exec(tag.id)
             if (!match) throw new Error('Please select filters from the Baozimh search filter list.')
             const group = match[1]!, value = match[2]!
-            if (values[group] !== 'all' && values[group] !== value) throw new Error('每組只能選一項。Select only one genre, one region, and one status.')
+            if (!['all', '*'].includes(values[group]!) && values[group] !== value) throw new Error('每組只能選一項。Select only one tag in each group.')
             values[group] = value
         }
         return this.getCatalogPage(values, metadata)
@@ -547,8 +553,8 @@ export class Baozimh extends Source {
         const key = JSON.stringify(values)
         const page = metadata?.key === key && Number.isInteger(metadata.page) && metadata.page > 0 ? metadata.page : 1
         const url = BASE_URL + '/api/bzmhq/amp_comic_list?' +
-            ['type', 'region', 'state'].map(group => group + '=' + encodeURIComponent(values[group]!)).join('&') +
-            '&filter=*&page=' + page + '&limit=36&language=tw'
+            ['type', 'region', 'state', 'filter'].map(group => group + '=' + encodeURIComponent(values[group] ?? (group === 'filter' ? '*' : 'all'))).join('&') +
+            '&page=' + page + '&limit=36&language=tw'
         const response = await this.requestManager.schedule(await this.websiteRequest(url, BASE_URL + '/classify'), 1)
         this.checkWebsiteResponse(response)
         const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data
