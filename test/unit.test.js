@@ -137,3 +137,22 @@ test('a chapter the site has taken down says so', async () => {
 })
 
 test.afterEach(() => { requestLog.length = 0 })
+
+test('tag search offers the letter row and sends it to the catalog', async () => {
+    pagesByUrl = {
+        'https://www.baozimh.com/classify': `<div>
+            <a href="/classify?type=rexie&region=all&state=all">熱血</a>
+            <a href="/classify?type=all&region=jp&state=all">日本</a>
+            <a href="/classify?type=all&region=all&state=serial">連載中</a>
+            <a href="/classify?type=all&region=all&state=all&filter=*">全部</a>
+            <a href="/classify?type=all&region=all&state=all&filter=b">B</a>
+        </div>`,
+        'https://www.baozimh.com/api/bzmhq/amp_comic_list?type=rexie&region=all&state=all&filter=b&page=1&limit=36&language=tw':
+            JSON.stringify({ items: [{ comic_id: 'demo', name: '示範', topic_img: 'demo.jpg' }] })
+    }
+    const sections = await source.getSearchTags()
+    assert.deepEqual(sections.map((s) => s.id), ['type', 'region', 'state', 'filter'])
+    assert.deepEqual(sections[3].tags.map((t) => [t.id, t.label]), [['filter:b', 'B']])
+    const result = await source.getSearchResults({ title: '', includedTags: [{ id: 'type:rexie' }, { id: 'filter:b' }] }, undefined)
+    assert.equal(result.results[0].mangaId, 'demo')
+})

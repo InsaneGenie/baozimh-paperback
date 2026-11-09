@@ -47,9 +47,15 @@ const HOME_SECTIONS: { title: string; type: DiscoverSectionType; catalog?: Recor
     { title: '熱血漫畫', type: DiscoverSectionType.simpleCarousel, catalog: { type: 'rexie' } }
 ]
 const GENRE_SECTION_ID = 'genres'
-const FILTER_GROUPS = ['type', 'region', 'state'] as const
+// 'filter' is the title's first letter (A–Z); the site's own "any" value for it is '*'.
+const FILTER_GROUPS = ['type', 'region', 'state', 'filter'] as const
 type FilterGroup = typeof FILTER_GROUPS[number]
 type CatalogFilters = Record<FilterGroup, string>
+
+// A real choice from /classify (not the "all" link): lowercase words such as 'rexie', letters, or digits.
+function isFilterValue(value: string): boolean {
+    return value !== 'all' && value !== '*' && /^[a-z0-9_-]+$/i.test(value)
+}
 
 type Card = { mangaId: string; title: string; imageUrl: string; subtitle?: string }
 
@@ -216,7 +222,7 @@ export class BaozimhExtension implements ExtensionImpl<typeof BaozimhConfig> {
 
         // Later pages of the broader rows continue from the matching catalog.
         if (metadata?.catalogPage) {
-            const page = await this.getCatalogPage({ type: 'all', region: 'all', state: 'all', ...home.catalog }, metadata.catalogPage)
+            const page = await this.getCatalogPage({ type: 'all', region: 'all', state: 'all', filter: '*', ...home.catalog }, metadata.catalogPage)
             return {
                 items: toItems(page.cards),
                 metadata: page.hasMore ? { catalogPage: metadata.catalogPage + 1 } : undefined
@@ -449,22 +455,28 @@ export class BaozimhExtension implements ExtensionImpl<typeof BaozimhConfig> {
 
     private async getFilterTags(): Promise<TagSection[]> {
         const $ = await this.getDocument(BASE_URL + '/classify')
-        const labels: Record<FilterGroup, string> = { type: '題材', region: '地區', state: '狀態' }
-        return FILTER_GROUPS.map((group) => {
+        const labels: Record<FilterGroup, string> = { type: '題材', region: '地區', state: '狀態', filter: '字母' }
+        const sections: TagSection[] = []
+        for (const group of FILTER_GROUPS) {
             const tags = new Map<string, string>()
             $('a[href*="/classify?"]').each((_index, element) => {
                 const href = $(element).attr('href') ?? ''
-                const value = href.match(new RegExp('[?&]' + group + '=([^&]+)'))?.[1]
+                const value = href.match(new RegExp('[?&]' + group + '=([^&#]+)'))?.[1]
                 const label = $(element).text().trim()
-                if (value && value !== 'all' && label && /^[a-z]+$/.test(value)) tags.set(value, label)
+                if (value && isFilterValue(value) && label) tags.set(value, label)
             })
-            if (!tags.size) throw new Error('Baozimh returned no search filters. Please try again later.')
-            return {
+            if (!tags.size) {
+                // The letter row is optional; the other three must be there.
+                if (group === 'filter') continue
+                throw new Error('Baozimh returned no search filters. Please try again later.')
+            }
+            sections.push({
                 id: group,
                 title: labels[group],
                 tags: Array.from(tags, ([id, title]): Tag => ({ id, title }))
-            }
-        })
+            })
+        }
+        return sections
     }
 
     // Paperback 0.9 shows the tag/filter sheet only when the source supplies this form.
@@ -480,7 +492,7 @@ export class BaozimhExtension implements ExtensionImpl<typeof BaozimhConfig> {
     private async getCatalogPage(values: CatalogFilters, page: number): Promise<{ cards: Card[]; hasMore: boolean }> {
         const url = BASE_URL + '/api/bzmhq/amp_comic_list?'
             + FILTER_GROUPS.map((group) => group + '=' + encodeURIComponent(values[group])).join('&')
-            + '&filter=*&page=' + page + '&limit=36&language=tw'
+            + '&page=' + page + '&limit=36&language=tw'
         let data: any
         try { data = JSON.parse(await this.fetchText(url, BASE_URL + '/classify')) }
         catch (error) {
@@ -509,10 +521,10 @@ export class BaozimhExtension implements ExtensionImpl<typeof BaozimhConfig> {
         // A genre picked on Discover arrives as a catalog filter.
         const filters = query.metadata as Partial<CatalogFilters> | undefined
         if (!query.title?.trim() && filters && FILTER_GROUPS.some((group) => filters[group])) {
-            const values: CatalogFilters = { type: 'all', region: 'all', state: 'all' }
+            const values: CatalogFilters = { type: 'all', region: 'all', state: 'all', filter: '*' }
             for (const group of FILTER_GROUPS) {
                 const value = filters[group]
-                if (typeof value === 'string' && /^[a-z]+$/.test(value)) values[group] = value
+                if (typeof value === 'string' && isFilterValue(value)) values[group] = value
             }
             const page = Number.isInteger(metadata?.page) && metadata.page > 0 ? metadata.page : 1
             const result = await this.getCatalogPage(values, page)
