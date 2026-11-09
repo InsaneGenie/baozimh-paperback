@@ -134,3 +134,48 @@ test('a Discover genre opens the matching catalog', async () => {
     assert.deepEqual(plain(result.metadata), { page: 2 })
     assert.match(sent.at(-1).url, /type=rexie&region=all&state=all/)
 })
+
+test('the search filter sheet lists the catalog filters and searches with the picks', async () => {
+    const { extension, sent } = loadExtension((request) => {
+        if (request.url === 'https://www.baozimh.com/classify') return page(
+            '<a href="/classify?type=all&region=all&state=all">全部</a>'
+            + '<a href="/classify?type=rexie&region=all&state=all">熱血</a>'
+            + '<a href="/classify?type=lianai&region=all&state=all">戀愛</a>'
+            + '<a href="/classify?type=all&region=jp&state=all">日本</a>'
+            + '<a href="/classify?type=all&region=all&state=serial">連載中</a>')
+        if (request.url.startsWith('https://www.baozimh.com/api/bzmhq/amp_comic_list?')) return {
+            body: JSON.stringify({ items: [{ comic_id: 'demo', name: '示範', topic_img: 'demo.jpg' }] })
+        }
+    })
+    await extension.initialise()
+    const form = await extension.getAdvancedSearchForm({ title: '' })
+    assert.equal(form.requiresExplicitSubmission, true)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const sections = form.getSections()
+    assert.deepEqual(plain(sections.map((section) => section.header)), ['題材', '地區', '狀態'])
+    assert.deepEqual(plain(sections[0].items.map((item) => item.title)), ['全部', '熱血', '戀愛'])
+
+    await sections[0].items.find((item) => item.title === '戀愛').onSelect()
+    await form.getSections()[1].items.find((item) => item.title === '日本').onSelect()
+    await form.formDidSubmit()
+    const metadata = form.getSearchQueryMetadata()
+    assert.deepEqual(plain(metadata), { type: 'lianai', region: 'jp', state: 'all' })
+
+    const result = await extension.getSearchResults({ title: '', metadata }, undefined, undefined)
+    assert.equal(result.items[0].mangaId, 'demo')
+    assert.match(sent.at(-1).url, /type=lianai&region=jp&state=all/)
+
+    // Reopening the sheet keeps the previous picks.
+    const again = await extension.getAdvancedSearchForm({ title: '', metadata })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.deepEqual(plain(again.getSearchQueryMetadata()), plain(metadata))
+})
+
+test('the search filter sheet shows an error when the filters cannot load', async () => {
+    const { extension } = loadExtension(() => page('<p>nothing</p>'))
+    await extension.initialise()
+    const form = await extension.getAdvancedSearchForm({ title: '' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.equal(form.getSections()[0].id, 'error')
+    await assert.rejects(form.formDidSubmit(), /no search filters/)
+})

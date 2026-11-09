@@ -3,7 +3,7 @@ import { ContentRating, SourceIntents, type ExtensionInfo } from '@paperback/typ
 export default {
     name: 'Manhuagui',
     description: 'Read Chinese manga from Manhuagui (看漫画).',
-    version: '1.0.0',
+    version: '1.0.1',
     icon: 'icon.png',
     language: 'zh',
     contentRating: ContentRating.MATURE,
