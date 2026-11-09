@@ -1,1 +1,1 @@
-{"name":"Manhuagui","description":"Read Chinese manga from Manhuagui (看漫画).","version":"1.0.0","icon":"icon.png","language":"zh","contentRating":"MATURE","capabilities":[1,16,4,64],"badges":[],"developers":[{"name":"Steven Lai","github":"https://github.com/InsaneGenie"}],"id":"Manhuagui"}
+{"name":"Manhuagui","description":"Read Chinese manga from Manhuagui (看漫画).","version":"1.0.1","icon":"icon.png","language":"zh","contentRating":"MATURE","capabilities":[1,16,4,64],"badges":[],"developers":[{"name":"Steven Lai","github":"https://github.com/InsaneGenie"}],"id":"Manhuagui"}

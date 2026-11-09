@@ -1,5 +1,5 @@
 {
-  "buildTime": "2026-11-05T05:07:57.876Z",
+  "buildTime": "2026-11-09T04:27:43.440Z",
   "builtWith": {
     "toolchain": "1.0.0-alpha.92",
     "types": "1.0.0-alpha.92"
@@ -12,7 +12,7 @@
     {
       "name": "Baozimh",
       "description": "Read Traditional Chinese manga from Baozimh.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "icon": "icon.png",
       "language": "zh",
       "contentRating": "MATURE",
@@ -34,7 +34,7 @@
     {
       "name": "Manhuagui",
       "description": "Read Chinese manga from Manhuagui (看漫画).",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "icon": "icon.png",
       "language": "zh",
       "contentRating": "MATURE",
